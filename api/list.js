@@ -1,4 +1,9 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
+
+const kv = new Redis({
+    url: process.env.KV_REST_API_URL,
+    token: process.env.KV_REST_API_TOKEN,
+});
 
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -9,14 +14,16 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Busca todas as chaves no Redis que começam com "server:"
         const keys = await kv.keys('server:*');
         const activeServers = [];
 
         for (const key of keys) {
             const data = await kv.get(key);
             if (data) {
-                activeServers.push(data); // Já vem parseado como Objeto
+                // O driver da Upstash já pode retornar o objeto parseado ou como string dependendo da versão.
+                // Garantimos que vire um objeto Javascript válido:
+                const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+                activeServers.push(`ws://${parsedData.ip}:${parsedData.port}`);
             }
         }
 

@@ -1,4 +1,9 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
+
+const kv = new Redis({
+    url: process.env.KV_REST_API_URL,
+    token: process.env.KV_REST_API_TOKEN,
+});
 
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -23,7 +28,6 @@ export default async function handler(req, res) {
 
         const serverKey = `server:${serverIp}:${port}`;
 
-        // Deleta o registro do banco de dados imediatamente
         await kv.del(serverKey);
 
         return res.status(200).json({ success: true, message: 'Servidor desregistrado com sucesso!' });
