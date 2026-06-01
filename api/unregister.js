@@ -3,6 +3,7 @@ import { Redis } from '@upstash/redis';
 const kv = new Redis({
     url: process.env.KV_REST_API_URL,
     token: process.env.KV_REST_API_TOKEN,
+    keepAlive: false
 });
 
 export default async function handler(req, res) {
@@ -20,7 +21,15 @@ export default async function handler(req, res) {
 
     try {
         const { port } = req.body;
-        const serverIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        
+        let serverIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        if (serverIp && serverIp.includes(',')) {
+            serverIp = serverIp.split(',')[0].trim();
+        }
+        if (serverIp === '::1' || serverIp === '127.0.0.1' || !serverIp) {
+            serverIp = '127.0.0.1';
+        }
+        serverIp = serverIp.replace(/[\[\]]/g, '');
 
         if (!port) {
             return res.status(400).json({ error: 'A propriedade "port" é obrigatória.' });
@@ -28,6 +37,7 @@ export default async function handler(req, res) {
 
         const serverKey = `server:${serverIp}:${port}`;
 
+        // Deleta o registro do banco de dados imediatamente
         await kv.del(serverKey);
 
         return res.status(200).json({ success: true, message: 'Servidor desregistrado com sucesso!' });

@@ -3,12 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "description": "API de listagem de servidores para SneakySnakes",
-  "main": "api/servers.js",
-  "scripts": {
-    "vercel-dev": "vercel dev"
-  },
   "dependencies": {
-    "@upstash/redis": "^1.38.0",
-    "@vercel/kv": "^3.0.0"
+    "@upstash/redis": "^1.34.4"
   }
 }
