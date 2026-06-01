@@ -1,9 +1,0 @@
-{
-  "name": "sneakysnakes-api",
-  "version": "1.0.0",
-  "description": "API de listagem de servidores para SneakySnakes",
-  "main": "api/servers.js",
-  "scripts": {
-    "vercel-dev": "vercel dev"
-  }
-}
