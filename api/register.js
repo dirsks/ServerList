@@ -16,7 +16,9 @@ export default async function handler(req,res){
     }
 
     if(req.method!=='POST'){
-        return res.status(405).json({error:'unauthorized method'});
+        return res.status(405).json({
+            error:'unauthorized method'
+        });
     }
 
     try{
@@ -28,52 +30,35 @@ export default async function handler(req,res){
             secure
         }=req.body;
 
-        let serverIp=host;
-
-        if(!serverIp){
-            serverIp=req.headers['x-forwarded-for']||req.socket.remoteAddress;
-
-            if(serverIp&&serverIp.includes(',')){
-                serverIp=serverIp.split(',')[0].trim();
-            }
-
-            if(serverIp==='::1'||serverIp==='127.0.0.1'||!serverIp){
-                serverIp='127.0.0.1';
-            }
-
-            serverIp=serverIp.replace(/[\[\]]/g,'');
-        }
-
-        if(!port){
+        if(!host||!port){
             return res.status(400).json({
-                error:'attempt to require missing fields'
+                error:'missing host or port'
             });
         }
 
-        const serverKey=`server:${serverIp}:${port}`;
-
-        const serverData={
-            ip:serverIp,
-            port:parseInt(port,10),
-            secure:!!secure,
-            name:name||`Official Server @ ${port}`,
-            lastSeen:timestamp||Date.now()
-        };
+        const serverKey=`server:${host}:${port}`;
 
         await kv.set(
             serverKey,
-            JSON.stringify(serverData),
-            {ex:120}
+            {
+                host,
+                port:Number(port),
+                secure:!!secure,
+                name:name||`Official Server @ ${host}:${port}`,
+                lastSeen:timestamp||Date.now()
+            },
+            {
+                ex:120
+            }
         );
 
         return res.status(200).json({
-            success:true,
-            message:'success'
+            success:true
         });
 
     }catch(error){
         return res.status(500).json({
-            error:'KV internal error: '+error.message
+            error:error.message
         });
     }
 }
