@@ -35,7 +35,7 @@ export default async function handler(req,res){
                     : 'ws';
 
             servers.push(
-                `${protocol}://${data.host}:${data.port}`
+                `${protocol}://${data.host||data.ip}:${data.port}`
             );
         }
 
