@@ -1,5 +1,4 @@
 import { Redis } from '@upstash/redis';
-import WebSocket from 'ws';
 
 const kv=new Redis({
     url:process.env.KV_REST_API_URL,
@@ -7,42 +6,20 @@ const kv=new Redis({
     keepAlive:false
 });
 
-async function checkServer(url){
-    return new Promise(resolve=>{
-        const ws=new WebSocket(url);
-
-        const timeout=setTimeout(()=>{
-            ws.terminate();
-            resolve(false);
-        },3000);
-
-        ws.on('open',()=>{
-            clearTimeout(timeout);
-            ws.close();
-            resolve(true);
-        });
-
-        ws.on('error',()=>{
-            clearTimeout(timeout);
-            resolve(false);
-        });
-    });
-}
-
 export default async function handler(req,res){
     res.setHeader('Access-Control-Allow-Origin','*');
     res.setHeader('Content-Type','application/json');
 
     if(req.method!=='GET'){
         return res.status(405).json({
-            error:'Use GET para listar.'
+            error:'Use GET'
         });
     }
 
     try{
         const keys=await kv.keys('server:*');
 
-        const activeServers=[];
+        const servers=[];
 
         for(const key of keys){
 
@@ -52,31 +29,18 @@ export default async function handler(req,res){
                 continue;
             }
 
-            const parsed=
-                typeof data==='string'
-                    ? JSON.parse(data)
-                    : data;
-
             const protocol=
-                parsed.secure
+                data.secure
                     ? 'wss'
                     : 'ws';
 
-            const url=
-                `${protocol}://${parsed.ip}:${parsed.port}`;
-
-            const alive=
-                await checkServer(url);
-
-            if(alive){
-                activeServers.push(url);
-            }else{
-                await kv.del(key);
-            }
+            servers.push(
+                `${protocol}://${data.host}:${data.port}`
+            );
         }
 
         return res.status(200).json({
-            servers:activeServers
+            servers
         });
 
     }catch(error){
