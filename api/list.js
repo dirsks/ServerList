@@ -1,35 +1,87 @@
 import { Redis } from '@upstash/redis';
+import WebSocket from 'ws';
 
-const kv = new Redis({
-    url: process.env.KV_REST_API_URL,
-    token: process.env.KV_REST_API_TOKEN,
-    keepAlive: false
+const kv=new Redis({
+    url:process.env.KV_REST_API_URL,
+    token:process.env.KV_REST_API_TOKEN,
+    keepAlive:false
 });
 
-export default async function handler(req, res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Content-Type', 'application/json');
+async function checkServer(url){
+    return new Promise(resolve=>{
+        const ws=new WebSocket(url);
 
-    if (req.method !== 'GET') {
-        return res.status(405).json({ error: 'Use GET para listar.' });
+        const timeout=setTimeout(()=>{
+            ws.terminate();
+            resolve(false);
+        },3000);
+
+        ws.on('open',()=>{
+            clearTimeout(timeout);
+            ws.close();
+            resolve(true);
+        });
+
+        ws.on('error',()=>{
+            clearTimeout(timeout);
+            resolve(false);
+        });
+    });
+}
+
+export default async function handler(req,res){
+    res.setHeader('Access-Control-Allow-Origin','*');
+    res.setHeader('Content-Type','application/json');
+
+    if(req.method!=='GET'){
+        return res.status(405).json({
+            error:'Use GET para listar.'
+        });
     }
 
-    try {
-        // Puxa do Redis todas as chaves dinâmicas com padrão "server:"
-        const keys = await kv.keys('server:*');
-        const activeServers = [];
+    try{
+        const keys=await kv.keys('server:*');
 
-        for (const key of keys) {
-            const data = await kv.get(key);
-            if (data) {
-                // Se o dado vier como string pura, realiza o Parse, caso contrário usa diretamente
-                const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
-                activeServers.push(`ws://${parsedData.ip}:${parsedData.port}`);
+        const activeServers=[];
+
+        for(const key of keys){
+
+            const data=await kv.get(key);
+
+            if(!data){
+                continue;
+            }
+
+            const parsed=
+                typeof data==='string'
+                    ? JSON.parse(data)
+                    : data;
+
+            const protocol=
+                parsed.secure
+                    ? 'wss'
+                    : 'ws';
+
+            const url=
+                `${protocol}://${parsed.ip}:${parsed.port}`;
+
+            const alive=
+                await checkServer(url);
+
+            if(alive){
+                activeServers.push(url);
+            }else{
+                await kv.del(key);
             }
         }
 
-        return res.status(200).json({ servers: activeServers });
-    } catch (error) {
-        return res.status(500).json({ error: 'Erro ao listar chaves do KV: ' + error.message });
+        return res.status(200).json({
+            servers:activeServers
+        });
+
+    }catch(error){
+        return res.status(500).json({
+            error:error.message
+        });
     }
 }
